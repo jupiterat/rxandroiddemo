@@ -30,10 +30,15 @@
 
 package com.raywenderlich.android.cheesefinder
 
+import android.text.Editable
+import android.text.TextWatcher
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_cheeses.*
+import java.util.concurrent.TimeUnit
+
+//import kotlinx.android.synthetic.main.activity_cheeses.*
 
 
 class CheeseActivity : BaseSearchActivity() {
@@ -41,7 +46,9 @@ class CheeseActivity : BaseSearchActivity() {
     override fun onStart() {
         super.onStart()
 //        demo1()
-        demo2()
+//        demo2()
+//        demo3()
+        demo4()
     }
 
     /**
@@ -66,23 +73,65 @@ class CheeseActivity : BaseSearchActivity() {
     private fun demo2() {
         val searchTextObservable = createButtonClickObservable()
 
+
         searchTextObservable
-                // 2
-                .subscribe { query ->
-                    // 3
-                    showResult(cheeseSearchEngine.search(query))
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext{
+                    showProgress()
                 }
-        searchTextObservable
-                .subscribeOn(AndroidSchedulers.mainThread())
                 .observeOn(Schedulers.io())
                 .map {
                     cheeseSearchEngine.search(it)
                 }
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe {
+                    hideProgress()
                     showResult(it)
                 }
 
+    }
+
+
+    private fun demo3() {
+        createTextChangeObservable()
+
+        val searchTextObservable = createTextChangeObservable()
+
+
+        searchTextObservable
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext{
+                    showProgress()
+                }
+                .observeOn(Schedulers.io())
+                .map {
+                    cheeseSearchEngine.search(it)
+                }
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe {
+                    hideProgress()
+                    showResult(it)
+                }
+    }
+
+    private fun demo4() {
+        val buttonClickStream = createButtonClickObservable()
+        val textChangeStream = createTextChangeObservable()
+        val searchTextObservable = Observable.merge<String>(buttonClickStream, textChangeStream)
+        searchTextObservable
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext{
+                    showProgress()
+                }
+                .observeOn(Schedulers.io())
+                .map {
+                    cheeseSearchEngine.search(it)
+                }
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe {
+                    hideProgress()
+                    showResult(it)
+                }
     }
 
     // 1
@@ -101,6 +150,31 @@ class CheeseActivity : BaseSearchActivity() {
                 searchButton.setOnClickListener(null)
             }
         }
+    }
+
+    private fun createTextChangeObservable() : Observable<String> {
+        var observable =  Observable.create<String> { emitter ->
+            var textWatcher = object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+
+                }
+
+                override fun afterTextChanged(s: Editable?) {
+
+                }
+
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    s?.toString()?.let { emitter.onNext(it) }
+                }
+
+            }
+
+            queryEditText.addTextChangedListener(textWatcher)
+            emitter.setCancellable {
+                queryEditText.removeTextChangedListener(textWatcher)
+            }
+        }
+        return observable.filter { it.length >= 2 }.debounce(1000, TimeUnit.MILLISECONDS)
     }
 
 }
