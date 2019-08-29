@@ -32,11 +32,14 @@ package com.raywenderlich.android.cheesefinder
 
 import android.text.Editable
 import android.text.TextWatcher
-import io.reactivex.Observable
+import android.util.Log
+import io.reactivex.*
 import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_cheeses.*
 import java.util.concurrent.TimeUnit
+import java.util.function.Consumer
 
 //import kotlinx.android.synthetic.main.activity_cheeses.*
 
@@ -47,16 +50,79 @@ class CheeseActivity : BaseSearchActivity() {
         super.onStart()
 //        demo1()
 //        demo2()
-//        demo3()
-        demo4()
+//        demoDebounce()
+//        demo4()
+        //1. demo create observable and observer
+        createObserverable()
+
+        //2. demo operators
+        //3. demo schedulers
+    }
+
+    private fun createObserverable() {
+        val observer  = object : Observer<Int> {
+            override fun onSubscribe(d: Disposable) {
+
+            }
+
+            override fun onComplete() {
+                Log.e("Observer","onComplete observer on: " + Thread.currentThread().name)
+            }
+
+            override fun onNext(t: Int) {
+                Log.e("Observer","onNext observer on:" + Thread.currentThread().name)
+                Log.e("Observer", "onNext: $t")
+            }
+
+            override fun onError(e: Throwable) {
+                Log.e("Observer", "error")
+            }
+
+
+        }
+        Observable.just(2,3,4,7)
+                .subscribeOn(Schedulers.newThread())
+                .doOnNext({
+                    Log.e("Observer","process on: " + Thread.currentThread().name)
+                })
+                .map {
+                    it ->  it * 2
+                }
+                .filter {
+                    it % 3 == 0
+                }
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(observer)
     }
 
     /**
      * UI is freezes because search is executed on main thread
      */
     private fun demo1() {
+
+        val observer = object  : Observer<String> {
+            override fun onComplete() {
+
+            }
+
+            override fun onSubscribe(d: Disposable) {
+
+            }
+
+            override fun onNext(t: String) {
+
+            }
+
+            override fun onError(e: Throwable) {
+
+            }
+
+        }
+
+
         val searchTextObservable = createButtonClickObservable()
 
+        searchTextObservable.subscribe(observer)
         searchTextObservable
                 // 2
                 .subscribe { query ->
@@ -92,8 +158,7 @@ class CheeseActivity : BaseSearchActivity() {
     }
 
 
-    private fun demo3() {
-        createTextChangeObservable()
+    private fun demoDebounce() {
 
         val searchTextObservable = createTextChangeObservable()
 
@@ -134,19 +199,17 @@ class CheeseActivity : BaseSearchActivity() {
                 }
     }
 
-    // 1
     private fun createButtonClickObservable(): Observable<String> {
-        // 2
+        //1: You create an observable with Observable.create(), and supply it with a new ObservableOnSubscribe
         return Observable.create { emitter ->
-            // 3
+            //2: Set up an OnClickListener on searchButton
             searchButton.setOnClickListener {
-                // 4
+                //When the click event happens, call onNext on the emitter and pass it the current text value of queryEditText
                 emitter.onNext(queryEditText.text.toString())
             }
-
-            // 5
+            //Keeping references can cause memory leaks in Java or Kotlin.
+            // It’s a useful habit to remove listeners as soon as they are no longer needed.
             emitter.setCancellable {
-                // 6
                 searchButton.setOnClickListener(null)
             }
         }
